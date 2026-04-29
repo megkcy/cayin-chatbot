@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAYIN Technology — Chat Support</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ① Lead capture screen -->
+  <div id="lead-screen" class="screen">
+    <div class="widget lead-widget">
+      <div class="widget-top-logo">
+        <img src="https://www.cayintech.com/favicon.ico" alt="" onerror="this.style.display='none'">
+      </div>
+      <div class="lead-hero">
+        <div class="brand-row">
+          <span class="brand-icon">CT</span>
+          <span class="brand-name">CAYIN Technology</span>
+        </div>
+        <p class="lead-sub">Please enter your details to start chatting with our support team.</p>
+      </div>
+      <form id="lead-form" class="lead-form">
+        <div class="field">
+          <label for="visitor-name">Your Name</label>
+          <input id="visitor-name" type="text" placeholder="e.g. John Smith" required autocomplete="name" />
+        </div>
+        <div class="field">
+          <label for="visitor-email">Email Address</label>
+          <input id="visitor-email" type="email" placeholder="you@company.com" required autocomplete="email" />
+        </div>
+        <button type="submit" class="start-btn">
+          Start Chat
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ② Chat screen -->
+  <div id="chat-screen" class="screen hidden">
+    <div class="widget chat-widget">
+
+      <!-- Top logo bar -->
+      <div class="top-logo-bar">
+        <img src="https://www.cayintech.com/favicon.ico" alt="CAYIN"
+             class="top-logo-img" onerror="this.style.display='none'">
+      </div>
+
+      <!-- Agent header -->
+      <div class="agent-bar">
+        <span class="agent-icon">CT</span>
+        <span class="agent-name">CAYIN Technology</span>
+      </div>
+
+      <!-- Messages -->
+      <div class="messages" id="chat-messages"></div>
+
+      <!-- Disclaimer -->
+      <div class="disclaimer">
+        This is an automated chatbot response. &nbsp;
+        <a href="https://www.cayintech.com" target="_blank" rel="noopener">Learn more</a>
+      </div>
+
+      <!-- Input -->
+      <div class="input-bar">
+        <input id="chat-input" type="text" placeholder="Ask me anything" autocomplete="off" />
+        <button id="send-btn" class="send-btn" title="Send">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
