@@ -11,8 +11,10 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 
+import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, send_from_directory
 from groq import Groq
@@ -24,6 +26,7 @@ groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 CONVERSATIONS_FILE = Path("data/conversations.json")
 CSV_FILE = Path("data/conversations.csv")
+SITE_KNOWLEDGE_FILE = Path("data/site_knowledge.txt")
 CONVERSATIONS_FILE.parent.mkdir(exist_ok=True)
 if not CONVERSATIONS_FILE.exists():
     CONVERSATIONS_FILE.write_text("[]")
@@ -264,8 +267,65 @@ def get_qa_context():
     return "\n".join(lines)
 
 
+def get_site_knowledge():
+    """Load previously scraped website content if available."""
+    if SITE_KNOWLEDGE_FILE.exists():
+        content = SITE_KNOWLEDGE_FILE.read_text(encoding="utf-8")
+        if content.strip():
+            return f"\n\nLATEST WEBSITE CONTENT (scraped from cayintech.com):\n{content}"
+    return ""
+
+
 def build_system_prompt():
-    return f"{SKILL_KNOWLEDGE}\n\n{get_qa_context()}"
+    return f"{SKILL_KNOWLEDGE}\n\n{get_qa_context()}{get_site_knowledge()}"
+
+
+# ── Web scraper ──────────────────────────────────────────────────────────────
+
+SCRAPE_PAGES = [
+    ("Homepage",         "https://www.cayintech.com"),
+    ("Products",         "https://www.cayintech.com/digital-signage-products/overview.html"),
+    ("GO CAYIN",         "https://www.gocayin.com/en"),
+    ("SMP Players",      "https://www.cayintech.com/digital-signage-products/digital-signage-player.html"),
+    ("CMS Software",     "https://www.cayintech.com/digital-signage-products/digital-signage-software.html"),
+    ("News/Updates",     "https://www.cayintech.com/news.html"),
+]
+
+SCRAPE_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; CAYINBot/1.0)"}
+
+
+def scrape_cayintech():
+    """Scrape key CAYIN pages and save to data/site_knowledge.txt."""
+    print(f"[{datetime.utcnow().isoformat()}] Starting CAYIN website scrape...")
+    sections = []
+
+    for label, url in SCRAPE_PAGES:
+        try:
+            r = requests.get(url, headers=SCRAPE_HEADERS, timeout=20)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, "html.parser")
+
+            # Remove noise tags
+            for tag in soup(["script", "style", "nav", "footer", "header",
+                              "noscript", "iframe", "form"]):
+                tag.decompose()
+
+            # Extract clean text
+            text = " ".join(soup.get_text(separator=" ").split())
+            text = text[:3000]  # cap per page to keep prompt size reasonable
+
+            sections.append(f"## {label} ({url})\n{text}")
+            print(f"  ✓ {label}: {len(text)} chars")
+        except Exception as e:
+            print(f"  ✗ {label}: {e}")
+
+    if sections:
+        scraped_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        content = f"Scraped: {scraped_at}\n\n" + "\n\n".join(sections)
+        SITE_KNOWLEDGE_FILE.write_text(content, encoding="utf-8")
+        print(f"[{datetime.utcnow().isoformat()}] Scrape complete — saved to {SITE_KNOWLEDGE_FILE}")
+    else:
+        print("Scrape failed: no content retrieved.")
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
@@ -376,15 +436,31 @@ def export_csv():
     )
 
 
-# ── Weekly scheduler ─────────────────────────────────────────────────────────
+# ── Schedulers ───────────────────────────────────────────────────────────────
 scheduler = BackgroundScheduler(timezone="Asia/Taipei")
+
+# Every Monday 09:00 — send weekly CSV report
 scheduler.add_job(
     send_weekly_csv_email,
-    CronTrigger(day_of_week="mon", hour=9, minute=0),  # Every Monday 09:00 Taipei time
+    CronTrigger(day_of_week="mon", hour=9, minute=0),
     id="weekly_csv_email",
     replace_existing=True,
 )
+
+# Every other Monday 09:00 — scrape cayintech.com for latest content
+scheduler.add_job(
+    scrape_cayintech,
+    CronTrigger(day_of_week="mon", hour=9, minute=5, week="*/2"),
+    id="biweekly_scrape",
+    replace_existing=True,
+)
+
 scheduler.start()
+
+# Run scraper once on startup if no data yet
+if not SITE_KNOWLEDGE_FILE.exists():
+    import threading
+    threading.Thread(target=scrape_cayintech, daemon=True).start()
 
 
 if __name__ == "__main__":
