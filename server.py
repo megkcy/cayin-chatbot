@@ -1,7 +1,10 @@
 import json
 import os
+import smtplib
 import uuid
 from datetime import datetime
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -71,7 +74,15 @@ QA_PAIRS = [
 ]
 
 SKILL_KNOWLEDGE = """
-You are a friendly CAYIN Technology sales assistant. Keep ALL replies SHORT — maximum 2-3 sentences. Be conversational, not formal.
+You are a friendly CAYIN Technology (鎧應科技) sales assistant.
+
+BEFORE every reply, you MUST:
+1. Search through the PRODUCT KNOWLEDGE and REFERENCE Q&A sections below
+2. Base your answer strictly on what is found there
+3. If the answer is not in the knowledge base, say you'll connect them with the team via the contact form
+
+Give helpful, complete answers — aim for 3-5 sentences. Cover the key points clearly but don't over-explain. Be conversational, not formal.
+Company name rules: ONLY use 鎧應科技 when replying in Traditional Chinese (繁體中文). For ALL other languages (English, Simplified Chinese, Japanese, Thai, Spanish, French, etc.), always use CAYIN Technology.
 
 CAYIN products:
 - GO CAYIN: Cloud signage platform (poster for displays, meetingPost+ for meeting rooms)
@@ -85,13 +96,72 @@ CAYIN products:
 
 RULES:
 - CRITICAL: Detect the language of EVERY user message and reply in that EXACT language. English → English. 繁體中文 → 繁體中文. 简体中文 → 简体中文. Never switch or mix languages.
-- NEVER quote prices — direct to contact form instead
 - NEVER mention official website URLs
 - Keep answers to 2-3 sentences max
-- For pricing or detailed inquiries: direct to contact form https://www.cayintech.com/contactus
+- For pricing or detailed inquiries on hardware (SMP players, CMS servers): direct to contact form https://www.cayintech.com/contactus
+- For ANY GO CAYIN questions or inquiries (GO CAYIN poster, meetingPost+, etc.): direct to https://www.gocayin.com/submit-inquiry
+- GO CAYIN poster pricing (always show BOTH TWD and USD when quoting prices):
+  * Basic: Free — 1 user, 2GB storage, 2 playback connections
+  * Professional: NT$400/月 or NT$4,000/年 (USD $15/month or $150/year) — 1 user, 20GB, 25 connections, all design resources
+  * Professional Team: NT$1,900/月 or NT$19,000/年 (USD $60/month or $600/year) — unlimited users, 300GB, 200 connections
+- GO CAYIN meetingPost+ pricing (always show BOTH TWD and USD when quoting prices):
+  * Basic: Free — 1 user, 2GB, 2 connections, 2 meeting rooms
+  * Professional: NT$600/月 or NT$6,000/年 (USD $20/month or $200/year) — 1 user, 20GB, 25 connections, 25 rooms, Google Calendar
+  * Professional Team: NT$1,900/月 or NT$19,000/年 (USD $60/month or $600/year) — unlimited users, 300GB, 200 connections, Microsoft 365 + Google Workspace
+- GO CAYIN pricing pages (always include the matching language link when discussing pricing):
+  * English — poster: https://www.gocayin.com/en/pricing | meetingPost+: https://www.gocayin.com/en/pricing#meetingPost+
+  * 繁體中文 — poster: https://www.gocayin.com/zh-TW/pricing | meetingPost+: https://www.gocayin.com/zh-TW/pricing#meetingPost+
 - For ANY "how to" / setup / configuration / troubleshooting questions: always include the Online Help Center link https://onlinehelp.cayintech.com/main.html in your reply
 - Phone: +886-2-2595-1005
 """
+
+
+def send_conversation_email(session):
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    notify_to = os.environ.get("NOTIFY_EMAIL", "press@cayintech.com")
+
+    if not smtp_user or not smtp_pass:
+        print("Email not sent: SMTP_USER / SMTP_PASS not configured.")
+        return
+
+    msgs = session.get("messages", [])
+    if not msgs:
+        return
+
+    # Build plain-text body
+    lines = [
+        f"New Chat Conversation — CAYIN Technology 鎧應科技",
+        f"{'=' * 50}",
+        f"Visitor : {session['name']}",
+        f"Email   : {session['email']}",
+        f"Started : {session['startedAt']}",
+        f"{'=' * 50}",
+        "",
+    ]
+    for m in msgs:
+        role = "Visitor" if m["role"] == "user" else "CAYIN Bot"
+        ts = m.get("timestamp", "")[:19].replace("T", " ")
+        lines.append(f"[{ts}] {role}:")
+        lines.append(f"  {m['content']}")
+        lines.append("")
+
+    body = "\n".join(lines)
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"[CAYIN Chat] {session['name']} <{session['email']}>"
+    msg["From"] = smtp_user
+    msg["To"] = notify_to
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        server.ehlo()
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(smtp_user, notify_to, msg.as_string())
+    print(f"Conversation emailed to {notify_to}")
 
 
 def load_conversations():
@@ -190,6 +260,18 @@ def chat(session_id):
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/api/session/<session_id>/end", methods=["POST"])
+def end_session(session_id):
+    conversations = load_conversations()
+    session = next((s for s in conversations if s["id"] == session_id), None)
+    if session and session.get("messages"):
+        try:
+            send_conversation_email(session)
+        except Exception as e:
+            print(f"Email error: {e}")
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/conversations", methods=["GET"])

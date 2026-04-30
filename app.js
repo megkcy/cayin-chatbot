@@ -48,6 +48,10 @@ function closeChat() {
   document.getElementById("chat-popup").classList.add("hidden");
   document.getElementById("bubble-icon-open").classList.remove("hidden");
   document.getElementById("bubble-icon-close").classList.add("hidden");
+  // Email conversation record on close
+  if (sessionId) {
+    fetch(`/api/session/${sessionId}/end`, { method: "POST" }).catch(() => {});
+  }
 }
 
 // ── Lead form ────────────────────────────────────────────────────────────────
