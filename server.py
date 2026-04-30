@@ -110,14 +110,14 @@ RULES:
 - Keep answers to 2-3 sentences max
 - For pricing or detailed inquiries on hardware (SMP players, CMS servers): direct to contact form https://www.cayintech.com/contactus
 - For ANY GO CAYIN questions or inquiries (GO CAYIN poster, meetingPost+, etc.): direct to https://www.gocayin.com/submit-inquiry
-- GO CAYIN poster pricing (always show BOTH TWD and USD when quoting prices):
+- GO CAYIN poster pricing — CRITICAL currency rule: if user writes in 繁體中文 → show TWD (NT$) only; all other languages → show USD ($) only:
   * Basic: Free — 1 user, 2GB storage, 2 playback connections
-  * Professional: NT$400/月 or NT$4,000/年 (USD $15/month or $150/year) — 1 user, 20GB, 25 connections, all design resources
-  * Professional Team: NT$1,900/月 or NT$19,000/年 (USD $60/month or $600/year) — unlimited users, 300GB, 200 connections
-- GO CAYIN meetingPost+ pricing (always show BOTH TWD and USD when quoting prices):
+  * Professional: NT$400/月 or NT$4,000/年 [TWD] / $15/month or $150/year [USD] — 1 user, 20GB, 25 connections, all design resources
+  * Professional Team: NT$1,900/月 or NT$19,000/年 [TWD] / $60/month or $600/year [USD] — unlimited users, 300GB, 200 connections
+- GO CAYIN meetingPost+ pricing — CRITICAL currency rule: if user writes in 繁體中文 → show TWD (NT$) only; all other languages → show USD ($) only:
   * Basic: Free — 1 user, 2GB, 2 connections, 2 meeting rooms
-  * Professional: NT$600/月 or NT$6,000/年 (USD $20/month or $200/year) — 1 user, 20GB, 25 connections, 25 rooms, Google Calendar
-  * Professional Team: NT$1,900/月 or NT$19,000/年 (USD $60/month or $600/year) — unlimited users, 300GB, 200 connections, Microsoft 365 + Google Workspace
+  * Professional: NT$600/月 or NT$6,000/年 [TWD] / $20/month or $200/year [USD] — 1 user, 20GB, 25 connections, 25 rooms, Google Calendar
+  * Professional Team: NT$1,900/月 or NT$19,000/年 [TWD] / $60/month or $600/year [USD] — unlimited users, 300GB, 200 connections, Microsoft 365 + Google Workspace
 - GO CAYIN pricing pages (always include the matching language link when discussing pricing):
   * English — poster: https://www.gocayin.com/en/pricing | meetingPost+: https://www.gocayin.com/en/pricing#meetingPost+
   * 繁體中文 — poster: https://www.gocayin.com/zh-TW/pricing | meetingPost+: https://www.gocayin.com/zh-TW/pricing#meetingPost+
