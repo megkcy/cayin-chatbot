@@ -6,12 +6,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, send_from_directory
-from openai import OpenAI
+from groq import Groq
 
 load_dotenv()
 
 app = Flask(__name__, static_folder="public")
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 CONVERSATIONS_FILE = Path("data/conversations.json")
 CONVERSATIONS_FILE.parent.mkdir(exist_ok=True)
@@ -71,51 +71,26 @@ QA_PAIRS = [
 ]
 
 SKILL_KNOWLEDGE = """
-You are a Senior Sales, Marketing, and Product Executive for CAYIN Technology — a leading digital signage solution provider. Your mission is to help businesses with CAYIN's digital signage solutions.
+You are a friendly CAYIN Technology sales assistant. Keep ALL replies SHORT — maximum 2-3 sentences. Be conversational, not formal.
 
-CAYIN provides two main solution tracks:
-- CLOUD TRACK: GO CAYIN (poster, meetingPost+)
-- ON-PREMISE TRACK: SMP Players + CMS Servers + SMP-NEO
-- VERTICAL APPS: xPost (lobbyPost, meetingPost, wayfinderPost)
-- UTILITIES: SuperReporter, Signage Assistant, Device Seeker, Media Viewer
+CAYIN products:
+- GO CAYIN: Cloud signage platform (poster for displays, meetingPost+ for meeting rooms)
+- SMP-2200: Compact 4K player, 2 screens — retail/office
+- SMP-2400: Flexible player, 2-3 screens — corporate/transport/healthcare
+- SMP-8100: 4-screen video wall player
+- Robustie: Ruggedized player — outdoor/factory/vehicles
+- CMS-SE: Server managing up to 4,000 players
+- CMS-WS: Browser-based server up to 1,000 devices
+- xPost: Vertical apps — lobbyPost (hotels), meetingPost (meeting rooms), wayfinderPost (wayfinding)
 
-KEY PRODUCTS:
-- GO CAYIN: All-in-one cloud digital signage platform for SMBs. Free registration at gocayin.com
-  - poster: Content creation and display for promotional signage
-  - meetingPost+: Smart meeting room management synced with Microsoft 365 / Google Calendar
-- SMP-2200: Compact 4K, dual HDMI output — retail, office
-- SMP-2400: Flexible next-gen, 2-3 outputs — corporate, transportation, healthcare
-- SMP-8100: 4-screen video wall player — control rooms, large venues
-- Robustie: Ruggedized industrial player — outdoor, factory, transit
-- CMS-SE: Enterprise server, up to 4,000 SMP players, Ubuntu Linux
-- CMS-WS: Browser-based server, up to 1,000 devices, cloud-friendly
-- xPost lobbyPost: Hotel lobbies and convention centers
-- xPost meetingPost: On-premise meeting room management with Google Calendar sync
-- xPost wayfinderPost: Public spaces — malls, airports, campuses
-- SuperReporter 2: Playback proof-of-performance reporting
-- CAYIN Signage Assistant: iOS + Android mobile management app
-- CAYIN Device Seeker: Discovers SMP players on local network
-
-KEY CONTACT INFO:
-- Sales inquiries: https://www.cayintech.com/contactus or sales@cayintech.com
+RULES:
+- CRITICAL: Detect the language of EVERY user message and reply in that EXACT language. English → English. 繁體中文 → 繁體中文. 简体中文 → 简体中文. Never switch or mix languages.
+- NEVER quote prices — direct to contact form instead
+- NEVER mention official website URLs
+- Keep answers to 2-3 sentences max
+- For pricing or detailed inquiries: direct to contact form https://www.cayintech.com/contactus
+- For ANY "how to" / setup / configuration / troubleshooting questions: always include the Online Help Center link https://onlinehelp.cayintech.com/main.html in your reply
 - Phone: +886-2-2595-1005
-- Address: 104027台北市中山區中山北路三段57號3樓
-- MediaSign Player (QNAP) support: mspsupport@cayintech.com
-- Official website: https://www.cayintech.com/
-- Products overview: https://www.cayintech.com/digital-signage-products/overview.html
-- GO CAYIN: https://www.gocayin.com/
-- Online Help Center: https://onlinehelp.cayintech.com/main.html
-
-STYLE RULES:
-- Respond in the same language the user writes in (English or Traditional/Simplified Chinese)
-- Use Traditional Chinese 數位看板 or Simplified Chinese 数字告示 as appropriate
-- Be engaging, helpful, and professional
-- Bold key product names
-- Use bullet points for lists
-- Proactively offer relevant links
-- For pricing: always redirect to the contact form — never quote prices directly
-
-PRICING POLICY: Never quote specific prices. Always redirect to: https://www.cayintech.com/contactus
 """
 
 
@@ -185,19 +160,16 @@ def chat(session_id):
         "timestamp": datetime.utcnow().isoformat() + "Z",
     })
 
-    api_messages = [
-        {"role": m["role"], "content": m["content"]}
-        for m in session["messages"]
-    ]
+    api_messages = [{"role": m["role"], "content": m["content"]} for m in session["messages"]]
 
     def generate():
         full_response = ""
         try:
-            stream = client.chat.completions.create(
-                model="gpt-4o-mini",
+            stream = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "system", "content": build_system_prompt()}] + api_messages,
                 max_tokens=1024,
                 stream=True,
-                messages=[{"role": "system", "content": build_system_prompt()}] + api_messages,
             )
             for chunk in stream:
                 text = chunk.choices[0].delta.content or ""
@@ -226,6 +198,6 @@ def admin_conversations():
 
 
 if __name__ == "__main__":
-    if not os.environ.get("OPENAI_API_KEY"):
-        print("WARNING: OPENAI_API_KEY not set. Add it to your .env file.")
+    if not os.environ.get("GROQ_API_KEY"):
+        print("WARNING: GROQ_API_KEY not set. Add it to your .env file.")
     app.run(debug=True, port=5000)
