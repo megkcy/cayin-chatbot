@@ -324,8 +324,49 @@ def scrape_cayintech():
         content = f"Scraped: {scraped_at}\n\n" + "\n\n".join(sections)
         SITE_KNOWLEDGE_FILE.write_text(content, encoding="utf-8")
         print(f"[{datetime.utcnow().isoformat()}] Scrape complete — saved to {SITE_KNOWLEDGE_FILE}")
+        _send_scrape_notification(scraped_at, len(sections))
     else:
         print("Scrape failed: no content retrieved.")
+
+
+def _send_scrape_notification(scraped_at, page_count):
+    """Send email notification after successful scrape."""
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    notify_to = os.environ.get("NOTIFY_EMAIL", "press@cayintech.com")
+
+    if not smtp_user or not smtp_pass:
+        print("Scrape notification not sent: SMTP not configured.")
+        return
+
+    pages_scraped = "\n".join(f"  • {label}: {url}" for label, url in SCRAPE_PAGES)
+    body = (
+        f"Hi,\n\n"
+        f"The CAYIN chatbot has successfully scraped the website and updated its knowledge base.\n\n"
+        f"Scraped at : {scraped_at}\n"
+        f"Pages updated : {page_count}\n\n"
+        f"Pages scraped:\n{pages_scraped}\n\n"
+        f"The chatbot will now use the latest website content when answering visitor questions.\n\n"
+        f"— CAYIN Chatbot"
+    )
+
+    msg = MIMEMultipart()
+    msg["Subject"] = f"[CAYIN Chatbot] Website Knowledge Updated — {scraped_at[:10]}"
+    msg["From"] = smtp_user
+    msg["To"] = notify_to
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, notify_to, msg.as_string())
+        print(f"Scrape notification emailed to {notify_to}")
+    except Exception as e:
+        print(f"Scrape notification email error: {e}")
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
