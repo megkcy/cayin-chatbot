@@ -1,22 +1,29 @@
+import csv
+import io
 import json
 import os
 import smtplib
 import uuid
 from datetime import datetime
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, send_from_directory
 from groq import Groq
 
 load_dotenv()
 
-app = Flask(__name__, static_folder="public")
+app = Flask(__name__, static_folder=".")
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 CONVERSATIONS_FILE = Path("data/conversations.json")
+CSV_FILE = Path("data/conversations.csv")
 CONVERSATIONS_FILE.parent.mkdir(exist_ok=True)
 if not CONVERSATIONS_FILE.exists():
     CONVERSATIONS_FILE.write_text("[]")
@@ -170,6 +177,83 @@ def load_conversations():
 
 def save_conversations(conversations):
     CONVERSATIONS_FILE.write_text(json.dumps(conversations, indent=2, ensure_ascii=False))
+    _write_csv(conversations)
+
+
+def _write_csv(conversations):
+    """Rebuild the full CSV from all conversations."""
+    rows = []
+    for s in conversations:
+        for m in s.get("messages", []):
+            rows.append({
+                "Session ID":   s.get("id", ""),
+                "Name":         s.get("name", ""),
+                "Email":        s.get("email", ""),
+                "Started At":   s.get("startedAt", "")[:19].replace("T", " "),
+                "Role":         "Visitor" if m["role"] == "user" else "CAYIN Bot",
+                "Message":      m.get("content", ""),
+                "Timestamp":    m.get("timestamp", "")[:19].replace("T", " "),
+            })
+    with CSV_FILE.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=[
+            "Session ID", "Name", "Email", "Started At",
+            "Role", "Message", "Timestamp",
+        ])
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _build_csv_bytes():
+    """Return current CSV as bytes (for email attachment)."""
+    if CSV_FILE.exists():
+        return CSV_FILE.read_bytes()
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=[
+        "Session ID", "Name", "Email", "Started At",
+        "Role", "Message", "Timestamp",
+    ])
+    writer.writeheader()
+    return buf.getvalue().encode("utf-8-sig")
+
+
+def send_weekly_csv_email():
+    """Called every Monday — sends full conversations CSV to NOTIFY_EMAIL."""
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    notify_to = os.environ.get("NOTIFY_EMAIL", "press@cayintech.com")
+
+    if not smtp_user or not smtp_pass:
+        print("Weekly email not sent: SMTP_USER / SMTP_PASS not configured.")
+        return
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    filename = f"cayin_chat_{today}.csv"
+    csv_bytes = _build_csv_bytes()
+
+    msg = MIMEMultipart()
+    msg["Subject"] = f"[CAYIN Chat] Weekly Conversation Report — {today}"
+    msg["From"] = smtp_user
+    msg["To"] = notify_to
+    msg.attach(MIMEText(
+        f"Hi,\n\nPlease find attached the weekly chat conversation report ({today}).\n\n"
+        "— CAYIN Chatbot",
+        "plain", "utf-8"
+    ))
+
+    part = MIMEBase("application", "octet-stream")
+    part.set_payload(csv_bytes)
+    encoders.encode_base64(part)
+    part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+    msg.attach(part)
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        server.ehlo()
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(smtp_user, notify_to, msg.as_string())
+    print(f"Weekly CSV emailed to {notify_to}")
 
 
 def get_qa_context():
@@ -188,12 +272,12 @@ def build_system_prompt():
 
 @app.route("/")
 def index():
-    return send_from_directory("public", "index.html")
+    return send_from_directory(".", "index.html")
 
 
 @app.route("/<path:filename>")
 def static_files(filename):
-    return send_from_directory("public", filename)
+    return send_from_directory(".", filename)
 
 
 @app.route("/api/session", methods=["POST"])
@@ -279,7 +363,31 @@ def admin_conversations():
     return jsonify(load_conversations())
 
 
+@app.route("/api/admin/export-csv", methods=["GET"])
+def export_csv():
+    """Manual download of the latest CSV."""
+    from flask import send_file
+    _write_csv(load_conversations())
+    return send_file(
+        str(CSV_FILE.resolve()),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=f"cayin_chat_{datetime.utcnow().strftime('%Y-%m-%d')}.csv",
+    )
+
+
+# ── Weekly scheduler ─────────────────────────────────────────────────────────
+scheduler = BackgroundScheduler(timezone="Asia/Taipei")
+scheduler.add_job(
+    send_weekly_csv_email,
+    CronTrigger(day_of_week="mon", hour=9, minute=0),  # Every Monday 09:00 Taipei time
+    id="weekly_csv_email",
+    replace_existing=True,
+)
+scheduler.start()
+
+
 if __name__ == "__main__":
     if not os.environ.get("GROQ_API_KEY"):
         print("WARNING: GROQ_API_KEY not set. Add it to your .env file.")
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=False)
