@@ -122,7 +122,7 @@ async function sendMessage() {
     });
 
     typingEl.remove();
-    const { textNode } = addBotMsg("", true);
+    const { bubble } = addBotMsg("", true);
 
     const reader  = response.body.getReader();
     const decoder = new TextDecoder();
@@ -139,8 +139,8 @@ async function sendMessage() {
         if (!line.startsWith("data: ")) continue;
         try {
           const p = JSON.parse(line.slice(6));
-          if (p.token) { full += p.token; textNode.textContent = full; scrollEnd(); }
-          if (p.error) { textNode.textContent = "Sorry, an error occurred. Please try again."; }
+          if (p.token) { full += p.token; bubble.innerHTML = linkify(full); scrollEnd(); }
+          if (p.error) { bubble.innerHTML = "Sorry, an error occurred. Please try again."; }
         } catch (_) {}
       }
     }
@@ -174,13 +174,26 @@ function now() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Convert plain text to HTML with clickable links
+function linkify(text) {
+  // Escape HTML special chars first to prevent XSS
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  // Replace URLs with <a> tags
+  return escaped.replace(
+    /(https?:\/\/[^\s<>"]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+}
+
 function addBotMsg(text, streaming = false) {
   const wrap   = document.createElement("div");
   wrap.className = "msg bot";
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  const textNode = document.createTextNode(text);
-  bubble.appendChild(textNode);
+  bubble.innerHTML = linkify(text);
   const time   = document.createElement("div");
   time.className = "msg-time";
   time.textContent = now();
@@ -193,7 +206,7 @@ function addBotMsg(text, streaming = false) {
   if (!isOpen) {
     document.getElementById("unread-badge").classList.remove("hidden");
   }
-  return { wrap, textNode };
+  return { wrap, bubble };
 }
 
 function addUserMsg(text) {
