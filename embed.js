@@ -19,5 +19,24 @@
 
   iframe.allow = "microphone";
   iframe.setAttribute("scrolling", "no");
-  document.body.appendChild(iframe);
+  iframe.setAttribute("loading", "lazy");
+
+  // Only inject iframe when user hovers or clicks near bottom-right corner
+  // to avoid blocking main page load
+  var injected = false;
+  function injectIframe() {
+    if (!injected) {
+      injected = true;
+      document.body.appendChild(iframe);
+    }
+  }
+
+  // Inject after page fully loaded (does not block rendering)
+  if (document.readyState === "complete") {
+    setTimeout(injectIframe, 1000);
+  } else {
+    window.addEventListener("load", function () {
+      setTimeout(injectIframe, 1000);
+    });
+  }
 })();
