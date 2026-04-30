@@ -17,12 +17,14 @@ from apscheduler.triggers.cron import CronTrigger
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, send_from_directory
+from google import genai as google_genai
 from groq import Groq
 
 load_dotenv()
 
 app = Flask(__name__, static_folder=".")
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+gemini_client = google_genai.Client(api_key=os.environ.get("GOOGLE_API_KEY")) if os.environ.get("GOOGLE_API_KEY") else None
 
 CONVERSATIONS_FILE = Path("data/conversations.json")
 CSV_FILE = Path("data/conversations.csv")
@@ -423,10 +425,14 @@ def chat(session_id):
 
     def generate():
         full_response = ""
+        system_prompt = build_system_prompt()
+
+        # ── Try Groq first ───────────────────────────────────────────────────
+        groq_ok = False
         try:
             stream = groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "system", "content": build_system_prompt()}] + api_messages,
+                messages=[{"role": "system", "content": system_prompt}] + api_messages,
                 max_tokens=1024,
                 stream=True,
             )
@@ -435,9 +441,38 @@ def chat(session_id):
                 if text:
                     full_response += text
                     yield f"data: {json.dumps({'token': text})}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            return
+            groq_ok = True
+        except Exception as groq_err:
+            print(f"Groq failed ({groq_err}), falling back to Gemini...")
+            full_response = ""  # reset before fallback
+
+        # ── Fallback to Gemini ───────────────────────────────────────────────
+        if not groq_ok:
+            if not gemini_client:
+                yield f"data: {json.dumps({'error': 'Service unavailable. Please try again later.'})}\n\n"
+                return
+            try:
+                gemini_messages = [
+                    {"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["content"]}]}
+                    for m in api_messages
+                ]
+                # Prepend system prompt as first user turn for Gemini
+                gemini_contents = [{"role": "user", "parts": [{"text": system_prompt + "\n\n(Acknowledge with OK and wait for questions.)"}]},
+                                    {"role": "model", "parts": [{"text": "OK"}]}] + gemini_messages
+
+                gemini_stream = gemini_client.models.generate_content_stream(
+                    model="gemini-2.5-flash",
+                    contents=gemini_contents,
+                )
+                for chunk in gemini_stream:
+                    text = chunk.text or ""
+                    if text:
+                        full_response += text
+                        yield f"data: {json.dumps({'token': text})}\n\n"
+            except Exception as gemini_err:
+                print(f"Gemini also failed: {gemini_err}")
+                yield f"data: {json.dumps({'error': 'Service unavailable. Please try again later.'})}\n\n"
+                return
 
         session["messages"].append({
             "role": "assistant",
