@@ -1,5 +1,44 @@
 # CAYIN Chatbot — 操作筆記
 
+---
+
+## 🎯 給主管試用（不需要任何技術背景）
+
+### 第一步：請同事先啟動伺服器
+> 請負責的同事在 `D:\claude-chatbot` 資料夾雙擊 **`start.bat`**，黑色視窗出現後即代表伺服器啟動。
+
+### 第二步：開啟 Chatbot
+
+| 裝置 | 網址 |
+|------|------|
+| 同一台電腦 | http://localhost:5000 |
+| 同一個辦公室網路（其他電腦/手機） | http://172.16.20.30:5000 |
+
+> 用瀏覽器（Chrome / Edge / Safari）開啟即可，不需要安裝任何東西。
+
+### 第三步：開始聊天
+1. 輸入您的**姓名**與**Email**，點「Start Chat」
+2. 直接用中文或英文提問
+
+### 建議測試問題
+
+| 問題 | 預期回覆 |
+|------|----------|
+| `SMP-2400 是什麼？` | 產品介紹 |
+| `GO CAYIN 怎麼用？` | 中文教學影片連結 |
+| `How to use GO CAYIN?` | 英文教學影片連結 |
+| `GO CAYIN poster 多少錢？` | 台幣定價 |
+| `GO CAYIN poster pricing?` | 美元定價 |
+| `我想聯絡業務` | 聯絡表單連結 |
+| `How do I choose between Robustie and Flexie?` | 英文產品建議 |
+
+### 查看對話紀錄
+所有訪客對話都會自動儲存：
+- 開啟 http://localhost:5000/api/admin/conversations 可查看 JSON 格式
+- 或下載 CSV：http://localhost:5000/api/admin/export-csv
+
+---
+
 ## 專案資訊
 - **GitHub**: https://github.com/megkcy/cayin-chatbot
 - **技術**: Python 3 + Flask + Groq API (主) + Google Gemini (備援)
@@ -9,6 +48,17 @@
 
 ## 快速啟動
 
+### Windows（目前電腦）
+```
+雙擊 start.bat
+```
+或在 CMD / PowerShell：
+```
+cd D:\claude-chatbot
+py server.py
+```
+
+### Mac / Linux
 ```bash
 cd ~/Desktop/claude-chatbot
 python3 server.py
@@ -16,7 +66,10 @@ python3 server.py
 
 瀏覽器打開：`http://localhost:5000`
 
-### 重啟 server（強制）
+### 重啟 server（Windows — 強制）
+關掉原本的視窗，再重新執行 `start.bat`。
+
+### 重啟 server（Mac/Linux — 強制）
 
 ```bash
 lsof -ti:5000 | xargs kill -9

@@ -31,7 +31,7 @@ CSV_FILE = Path("data/conversations.csv")
 SITE_KNOWLEDGE_FILE = Path("data/site_knowledge.txt")
 CONVERSATIONS_FILE.parent.mkdir(exist_ok=True)
 if not CONVERSATIONS_FILE.exists():
-    CONVERSATIONS_FILE.write_text("[]")
+    CONVERSATIONS_FILE.write_text("[]", encoding="utf-8")
 
 # Q&A pairs loaded from CSV at startup
 QA_PAIRS = [
@@ -83,6 +83,14 @@ QA_PAIRS = [
         "question": "I want to control an LED board. Which CAYIN solution and product should I use?",
         "answer": "Unlike standard LCD resolutions, LED boards usually have custom resolutions. CAYIN SMP players support custom resolutions and can drive LED boards. For specific LED board integration, please contact our team at https://www.cayintech.com/about/contactus.html for tailored recommendations.",
     },
+    {
+        "question": "GO CAYIN 怎麼用 如何使用 教學 操作 入門 新手",
+        "answer": "這裡有 GO CAYIN 的中文教學影片，歡迎參考：https://www.youtube.com/playlist?list=PLs1Kw-AO8gBlLPd6c_20RzLfjzhTBWrXK",
+    },
+    {
+        "question": "How to use GO CAYIN tutorial guide getting started",
+        "answer": "Here are the GO CAYIN tutorial videos to help you get started: https://www.youtube.com/playlist?list=PLs1Kw-AO8gBkZtHXpjIQs5smL_09W86cU",
+    },
 ]
 
 SKILL_KNOWLEDGE = """
@@ -94,7 +102,10 @@ BEFORE every reply, you MUST:
 3. If the answer is not in the knowledge base, say you'll connect them with the team via the contact form
 
 Give helpful, complete answers — aim for 3-5 sentences. Cover the key points clearly but don't over-explain. Be conversational, not formal.
-Company name rules: ONLY use 鎧應科技 when replying in Traditional Chinese (繁體中文). For ALL other languages (English, Simplified Chinese, Japanese, Thai, Spanish, French, etc.), always use CAYIN Technology.
+Company name rules — ABSOLUTE, NO EXCEPTIONS:
+- Replying in 繁體中文 → ALWAYS use 鎧應 or 鎧應科技 when referring to the company. NEVER write "CAYIN" alone in any Chinese reply.
+- "GO CAYIN" is a product name — keep it as "GO CAYIN" in ALL languages, including 繁體中文. Do NOT translate or replace it.
+- Replying in English or any other language → ALWAYS use CAYIN Technology for the company name. NEVER write 鎧應 in non-Chinese replies.
 
 CAYIN products:
 - GO CAYIN: Cloud signage platform (poster for displays, meetingPost+ for meeting rooms)
@@ -128,6 +139,9 @@ GO CAYIN meetingPost+ pricing:
   * English — poster: https://www.gocayin.com/en/pricing | meetingPost+: https://www.gocayin.com/en/pricing#meetingPost+
   * 繁體中文 — poster: https://www.gocayin.com/zh-TW/pricing | meetingPost+: https://www.gocayin.com/zh-TW/pricing#meetingPost+
 - For ANY "how to" / setup / configuration / troubleshooting questions: always include the Online Help Center link https://onlinehelp.cayintech.com/main.html in your reply
+- GO CAYIN tutorial videos — LANGUAGE RULE, NO EXCEPTIONS:
+  * If the user asks how to use / tutorial / getting started for GO CAYIN in 繁體中文 → reply with: https://www.youtube.com/playlist?list=PLs1Kw-AO8gBlLPd6c_20RzLfjzhTBWrXK
+  * If the user asks in English or any other language → reply with: https://www.youtube.com/playlist?list=PLs1Kw-AO8gBkZtHXpjIQs5smL_09W86cU
 - Phone: +886-2-2595-1005
 """
 
@@ -181,11 +195,11 @@ def send_conversation_email(session):
 
 
 def load_conversations():
-    return json.loads(CONVERSATIONS_FILE.read_text())
+    return json.loads(CONVERSATIONS_FILE.read_text(encoding="utf-8"))
 
 
 def save_conversations(conversations):
-    CONVERSATIONS_FILE.write_text(json.dumps(conversations, indent=2, ensure_ascii=False))
+    CONVERSATIONS_FILE.write_text(json.dumps(conversations, indent=2, ensure_ascii=False), encoding="utf-8")
     _write_csv(conversations)
 
 
